@@ -11,43 +11,45 @@ rem finish when (hasBegin == 1 && pid = NULL) => keep locked if (hasBegin == 0 |
 :spinlock
 goto :getPid
 :check
+rem echo After get PID
+rem echo %PID%
 if %hasBegin% == 1 (
-	if %PID% == 0 (		
-		echo %PID%
+	if %PID% == 0 (	
 		echo "hasBegin == 1 && PID == 0 => 42 begin but and finished"
 		goto :end
 	)
-	echo %PID%
 	echo "hasBegin == 1 && PID != 0 => 42 begin but not finished yet"
 	goto :spinlock
 )
-echo %PID%
 echo "hasBegin == 0 && PID == X => 42 has not begun yet"
-SET hasBegin=1
 goto :spinlock
 
 
 :getPID
-echo getPID
-SET /a count=0
+rem echo getPID
+SET /a count=1
 
 rem Get rows
-FOR /F "tokens=* USEBACKQ" %%F IN (`tasklist /fi "PID eq 508" `) DO (
+FOR /F "tokens=* USEBACKQ" %%F IN (`tasklist /fi "PID eq 8792" `) DO (
   SET var!count!=%%F
   SET /a count=!count!+1
-  echo %%F
 )
 
-echo COUNT
-echo !count!
+rem echo ROW
+rem echo %var3%
+rem echo COUNT
+rem echo !count!
 
-IF !count! == 2 (
-	echo If count == 2 means that no process has been found so:
+rem echo If count == 2 means that no process has been found so:
+rem Or has died or hasn't begin. Anyway return to check.
+IF !count! == 3 (
 	SET PID=0
 	goto :check
 )
 
-echo %var4%
+rem if goes here means that process is alive so set for first time hasBegin 
+rem or it was already alive, we re-set hasBegin (no t&t&s)
+SET hasBegin=1
 
 rem Get PID
 SET /a count=0
@@ -57,8 +59,6 @@ FOR %%A IN (%var3%) DO (
 	)		
 	SET /a count=!count!+1
 )
-
-echo %PID%
 goto :check
 
 :end
