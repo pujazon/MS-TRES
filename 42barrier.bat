@@ -3,65 +3,94 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
 
 SET hasBegin=0
-SET PID=0
+SET iniN = 0;
 SET count=0
 
-rem finish when (hasBegin == 1 && pid = NULL) => keep locked if (hasBegin == 0 || pid != NULL)
+rem First get initial num of CMD opened
+goto :NumCMD
+:ret
+echo NumCMD
+echo !iniN!
 
+rem Spinlock
 :spinlock
-goto :getPid
-:check
-rem echo After get PID
-rem echo %PID%
-if %hasBegin% == 1 (
-	if %PID% == 0 (	
-		echo "hasBegin == 1 && PID == 0 => 42 begin but and finished"
-		goto :end
-	)
-	echo "hasBegin == 1 && PID != 0 => 42 begin but not finished yet"
-	goto :spinlock
-)
-echo "hasBegin == 0 && PID == X => 42 has not begun yet"
-goto :spinlock
+	goto :test_and_set
+:end_spinlock
 
 
-:getPID
-rem echo getPID
-SET /a count=1
+rem .............................................................................
+:test_and_set
+rem echo Get current num of CMD opened
+SET /a count=0
 
 rem Get rows
-FOR /F "tokens=* USEBACKQ" %%F IN (`tasklist /fi "PID eq 8792" `) DO (
+FOR /F "tokens=* USEBACKQ" %%F IN (`tasklist /fi "IMAGENAME eq cmd.exe" `) DO (
   SET var!count!=%%F
   SET /a count=!count!+1
 )
 
+SET /a count=!count!-4
+
+rem if there is none there are 2
 rem echo ROW
 rem echo %var3%
-rem echo COUNT
+REM echo Current CMD
+REM echo !count!
+
+rem (ini < current) && hasBegin == 0 -> Acaba de abrir 42
+IF !iniN! LSS !count! (	
+	if %hasBegin% == 0 (
+		echo "Starts.."
+		SET hasBegin=1
+		goto :spinlock
+	)
+)
+
+rem Here means that hasn't entered to if
+
+if %hasBegin% == 0 ( 
+	echo "Idle..."
+	goto :spinlock
+)
+
+rem echo check if finished: current cmd eq ini
+SET /a count=0
+
+rem Get rows
+FOR /F "tokens=* USEBACKQ" %%F IN (`tasklist /fi "IMAGENAME eq cmd.exe" `) DO (
+  SET var!count!=%%F
+  SET /a count=!count!+1
+)
+SET /a count=!count!-4
+
+
+rem echo last check CMD
 rem echo !count!
 
-rem echo If count == 2 means that no process has been found so:
-rem Or has died or hasn't begin. Anyway return to check.
-IF !count! == 3 (
-	SET PID=0
-	goto :check
+rem if current == ini && hasBegin -> Finished
+IF !iniN! EQU !count! (	
+		echo unlock
+		goto :unlock
 )
 
-rem if goes here means that process is alive so set for first time hasBegin 
-rem or it was already alive, we re-set hasBegin (no t&t&s)
-SET hasBegin=1
 
-rem Get PID
-SET /a count=0
-FOR %%A IN (%var3%) DO (
-	IF !count! leq 1 (
-		SET /a PID=%%A
-	)		
-	SET /a count=!count!+1
+echo Running...
+goto :spinlock
+
+rem .............................................................................
+
+:NumCMD
+FOR /F "tokens=* USEBACKQ" %%F IN (`tasklist /fi "IMAGENAME eq cmd.exe" `) DO (
+  SET var!iniN!=%%F
+  SET /a iniN=!iniN!+1
 )
-goto :check
 
-:end
+rem Delete noise: 3 top rows and 1 bottom row
+SET /a iniN=!iniN!-4
+goto :ret
+
+rem .............................................................................
+:unlock
 
 ENDLOCAL
 	
